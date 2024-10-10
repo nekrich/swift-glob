@@ -22,13 +22,15 @@ public struct MatchResult {
 ///   - exclude: When provided, ignore results that match these patterns. If a directory matches an exclude pattern, none of it's descendents will be matched.
 ///   - keys: An array of keys that identify the properties that you want pre-fetched for each returned url. The values for these keys are cached in the corresponding URL objects. You may specify nil for this parameter. For a list of keys you can specify, see [Common File System Resource Keys](https://developer.apple.com/documentation/corefoundation/cfurl/common_file_system_resource_keys).
 ///   - skipHiddenFiles: When true, hidden files will not be returned.
+///   - fileManager: A FileManager to use for directory contents look up. Defaults to the `FileManager.default`.
 /// - Returns: An async collection of urls.
 public func search(
 	directory baseURL: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
 	include: [Pattern] = [],
 	exclude: [Pattern] = [],
 	includingPropertiesForKeys keys: [URLResourceKey] = [],
-	skipHiddenFiles: Bool = true
+	skipHiddenFiles: Bool = true,
+  fileManager: GlobFileManagerInterface = FileManager.default
 ) -> AsyncThrowingStream<URL, any Error> {
 	search(
 		directory: baseURL,
@@ -49,7 +51,8 @@ public func search(
 			return .init(matches: true, skipDescendents: false)
 		},
 		includingPropertiesForKeys: keys,
-		skipHiddenFiles: skipHiddenFiles
+		skipHiddenFiles: skipHiddenFiles,
+    fileManager: fileManager
 	)
 }
 
@@ -64,12 +67,14 @@ public func search(
 ///   - matching: The closure used to filter results. Both the url and the relative path are provided and you can use either one to match against.
 ///   - keys: An array of keys that identify the properties that you want pre-fetched for each returned url. The values for these keys are cached in the corresponding URL objects. You may specify nil for this parameter. For a list of keys you can specify, see [Common File System Resource Keys](https://developer.apple.com/documentation/corefoundation/cfurl/common_file_system_resource_keys).
 ///   - skipHiddenFiles: When true, hidden files will not be returned.
+///   - fileManager: A FileManager to use for directory contents look up. Defaults to the `FileManager.default`.
 /// - Returns: An async collection of urls.
 public func search(
 	directory baseURL: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
 	matching: @escaping @Sendable (_ url: URL, _ relativePath: String) throws -> MatchResult,
 	includingPropertiesForKeys keys: [URLResourceKey] = [],
-	skipHiddenFiles: Bool = true
+	skipHiddenFiles: Bool = true,
+	fileManager: GlobFileManagerInterface = FileManager.default
 ) -> AsyncThrowingStream<URL, any Error> {
 	AsyncThrowingStream(bufferingPolicy: .unbounded) { continuation in
 		let task = Task {
@@ -80,7 +85,7 @@ public func search(
 						if skipHiddenFiles {
 							options.insert(.skipsHiddenFiles)
 						}
-						let contents = try FileManager.default.contentsOfDirectory(
+						let contents = try fileManager.contentsOfDirectory(
 							at: directory,
 							includingPropertiesForKeys: keys + [.isDirectoryKey],
 							options: options
